@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Scientific Calculator (Vanilla JS)</title>
+  <style>
+    :root{--bg:#f7f8fa;--card:#ffffff;--glass:rgba(255,255,255,0.6);--shadow:rgba(0,0,0,0.08)}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#ffffff 0%,#f0f2f5 100%);font-family:Inter,Segoe UI,Roboto,Arial;color:#111}
+    .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{width:420px;max-width:95vw;padding:16px;border-radius:14px;background:var(--card);box-shadow:0 8px 30px var(--shadow);backdrop-filter:blur(6px);border:1px solid rgba(0,0,0,0.04)}
+    .display{height:86px;border-radius:12px;padding:12px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.85));border:1px solid rgba(0,0,0,0.03);margin-bottom:12px;font-size:26px;overflow:hidden}
+    .expr{font-size:12px;color:#666;margin-bottom:6px}
+    .out{font-weight:600}
+    .pad{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+    button{padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,0.06);background:linear-gradient(180deg,#fff,#f6f8fa);box-shadow:0 4px 10px rgba(0,0,0,0.04);cursor:pointer;font-size:14px}
+    button.op{background:linear-gradient(180deg,#eef3ff,#e8edff)}
+    button.func{background:linear-gradient(180deg,#fbfbff,#f6f7ff)}
+    button.wide{grid-column:span 2}
+    .footer{font-size:12px;color:#777;margin-top:10px;text-align:center}
+    @media (max-width:720px){.card{width:95vw;padding:10px}.pad{grid-template-columns:repeat(4,1fr)}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" role="application" aria-label="Scientific calculator">
+      <div class="display" id="display" aria-live="polite">
+        <div class="expr" id="expr"></div>
+        <div class="out" id="out">0</div>
+      </div>
+
+      <div style="margin-bottom:8px;display:flex;gap:8px;justify-content:space-between;align-items:center">
+        <div style="font-size:12px;color:#555">Angle: <strong id="angle">RAD</strong></div>
+        <div style="display:flex;gap:8px">
+          <button id="toggleAngle">Toggle deg/rad</button>
+          <button id="ce">CE</button>
+        </div>
+      </div>
+
+      <div class="pad" id="pad">
+        <button class="func" data-f="sin">sin</button>
+        <button class="func" data-f="cos">cos</button>
+        <button class="func" data-f="tan">tan</button>
+        <button class="func" data-f="ln">ln</button>
+        <button class="func" data-f="log">log</button>
+        <button class="func" data-f="pi">Ï€</button>
+
+        <button data-a="AC">AC</button>
+        <button data-a="DEL">âŒ«</button>
+        <button class="func" data-f="inv">1/x</button>
+        <button class="op" data-op="/">/</button>
+        <button class="func" data-f="sqrt">âˆš</button>
+        <button class="func" data-f="square">xÂ²</button>
+
+        <button data-d="7">7</button>
+        <button data-d="8">8</button>
+        <button data-d="9">9</button>
+        <button class="op" data-op="*">Ã—</button>
+        <button class="func" data-f="percent">%</button>
+        <button class="func" data-f="e">e</button>
+
+        <button data-d="4">4</button>
+        <button data-d="5">5</button>
+        <button data-d="6">6</button>
+        <button class="op" data-op="-">âˆ’</button>
+        <button class="op" data-op="^">xÊ¸</button>
+        <button class="func" data-f="pi">Ï€</button>
+
+        <button data-d="1">1</button>
+        <button data-d="2">2</button>
+        <button data-d="3">3</button>
+        <button class="op" data-op="+">+</button>
+        <button class="wide" data-d="0">0</button>
+        <button data-d=".">.</button>
+
+        <button class="op" style="grid-column:span 2" id="equals">=</button>
+      </div>
+      <div class="footer">Vanilla JS scientific calculator â€” works without Babel/React.</div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const out = document.getElementById('out');
+      const expr = document.getElementById('expr');
+      const pad = document.getElementById('pad');
+      const angleLabel = document.getElementById('angle');
+      let angleMode = 'rad';
+      let display = '0';
+      let prev = null; let op = null; let overwrite = false;
+
+      function render(){ out.textContent = display; expr.textContent = op && prev!=null ? prev + ' ' + op : ''; angleLabel.textContent = angleMode.toUpperCase(); }
+      function toRad(x){ return x * Math.PI / 180; }
+      function parse(){ return parseFloat(display); }
+      function setDisplay(v){ display = String(v); overwrite = true; render(); }
+
+      function inputDigit(d){
+        if(overwrite || display==='0') { display = d; overwrite = false; }
+        else display = display + d; render();
+      }
+      function inputDot(){ if(overwrite){ display='0.'; overwrite=false; render(); return;} if(!display.includes('.')) { display += '.'; render(); } }
+      function clearAll(){ display='0'; prev=null; op=null; overwrite=false; render(); }
+      function del(){ if(overwrite || display.length===1){ display='0'; overwrite=false; } else display = display.slice(0,-1); render(); }
+      function toggleSign(){ if(display==='0') return; display = display.startsWith('-')?display.slice(1):'-'+display; render(); }
+
+      function compute(a,b,operator){
+        if(isNaN(a) || isNaN(b)) return 'Error';
+        if(operator === '+') return a + b;
+        if(operator === '-') return a - b;
+        if(operator === '*') return a * b;
+        if(operator === '/') return b===0? 'Error' : a / b;
+        if(operator === '^') return Math.pow(a,b);
+        return b;
+      }
+
+      function applyOperator(nextOp){
+        const current = parse();
+        if(prev==null){ prev = current; }
+        else if(op){ const res = compute(prev,current,op); prev = res; display = String(res); }
+        op = nextOp; overwrite = true; render();
+      }
+      function equals(){ if(op==null) return; const current = parse(); const res = compute(prev,current,op); display = String(res); prev=null; op=null; overwrite=true; render(); }
+
+      function applyFunc(name){ let x = parse(); if(isNaN(x)) return; let res = x; switch(name){
+        case 'sqrt': res = Math.sqrt(x); break;
+        case 'square': res = x*x; break;
+        case 'inv': res = 1/x; break;
+        case 'percent': res = prev!=null ? prev * (x/100) : x/100; break;
+        case 'ln': res = Math.log(x); break;
+        case 'log': res = Math.log10 ? Math.log10(x) : Math.log(x)/Math.LN10; break;
+        case 'sin': res = angleMode==='deg' ? Math.sin(toRad(x)) : Math.sin(x); break;
+        case 'cos': res = angleMode==='deg' ? Math.cos(toRad(x)) : Math.cos(x); break;
+        case 'tan': res = angleMode==='deg' ? Math.tan(toRad(x)) : Math.tan(x); break;
+        case 'pi': res = Math.PI; break;
+        case 'e': res = Math.E; break;
+      }}
+      function applyFunc(name){ let x = parse(); if(isNaN(x)) return; let res = x; switch(name){
+        case 'sqrt': res = Math.sqrt(x); break;
+        case 'square': res = x*x; break;
+        case 'inv': res = 1/x; break;
+        case 'percent': res = prev!=null ? prev * (x/100) : x/100; break;
+        case 'ln': res = Math.log(x); break;
+        case 'log': res = Math.log10 ? Math.log10(x) : Math.log(x)/Math.LN10; break;
+        case 'sin': res = angleMode==='deg' ? Math.sin(toRad(x)) : Math.sin(x); break;
+        case 'cos': res = angleMode==='deg' ? Math.cos(toRad(x)) : Math.cos(x); break;
+        case 'tan': res = angleMode==='deg' ? Math.tan(toRad(x)) : Math.tan(x); break;
+        case 'pi': res = Math.PI; break;
+        case 'e': res = Math.E; break;
+      }
+      if(String(res)==='Infinity' || String(res)==='-Infinity' || isNaN(res)) res = 'Error';
+      setDisplay(res);
+    }
+
+      pad.addEventListener('click', function(e){ const t = e.target; if(!t) return; if(t.dataset.d) { inputDigit(t.dataset.d); return; } if(t.dataset.a){ const a=t.dataset.a; if(a==='AC') clearAll(); else if(a==='DEL') del(); return; } if(t.dataset.op){ applyOperator(t.dataset.op); return; } if(t.dataset.f){ applyFunc(t.dataset.f); return; } if(t.id==='equals'){ equals(); return; } });
+
+      document.getElementById('toggleAngle').addEventListener('click', function(){ angleMode = angleMode==='rad'?'deg':'rad'; render(); });
+      document.getElementById('ce').addEventListener('click', function(){ display='0'; overwrite=false; render(); });
+
+      // keyboard support
+      window.addEventListener('keydown', function(e){ const k=e.key; if(/^[0-9]$/.test(k)) inputDigit(k); else if(k==='.') inputDot(); else if(k==='Enter' || k==='=') { e.preventDefault(); equals(); } else if(k==='Backspace') del(); else if(k==='Escape') clearAll(); else if(['+','-','*','/'].includes(k)) applyOperator(k); });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
